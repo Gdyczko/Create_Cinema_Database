@@ -198,3 +198,144 @@ FROM Rooms
 GROUP BY (Room_Type)
 GO
 ```
+## Procedures:
+1. Here's the procedure "P_Add_New_Movie" that adds a new movie and its attributes to the "Movies" table, provided that a movie with the given ID and title does not already exist in the table. Otherwise, it sends a message to the user indicating that the movie already exists in the database.
+
+```sql
+CREATE PROC P_Add_New_Movie (
+    @Movie_Id INT,
+    @Movie_Title VARCHAR(50),
+    @Duration TIME,
+    @Release_Date DATE,
+    @Screening_Start_Date DATE,
+    @Screening_End_Date DATE
+)
+AS
+IF (NOT EXISTS (
+    SELECT *
+    FROM Movies
+    WHERE Movie_Id = @Movie_Id AND Movie_Title = @Movie_Title
+))
+INSERT INTO Movies VALUES (
+    @Movie_Id,
+    @Movie_Title,
+    @Duration,
+    @Release_Date,
+    @Screening_Start_Date,
+    @Screening_End_Date
+)
+ELSE BEGIN
+    DECLARE @Message NVARCHAR(256)
+    SET @Message = FORMATMESSAGE('This movie already exists in the database.')
+    PRINT @Message
+END
+GO
+```
+2. The following procedure adds a new employee, provided that such an employee
+does not already exist in the database.
+```sql
+CREATE PROC P_Add_New_Employee (
+    @Employee_Id INT,
+    @First_Name VARCHAR(50),
+    @Surname VARCHAR(50),
+    @Date_of_Birth INT,
+    @Position VARCHAR(50),
+    @Salary DECIMAL
+)
+AS
+BEGIN
+    IF NOT EXISTS (
+        SELECT *
+        FROM Employees
+        WHERE Employee_Id = @Employee_Id
+    )
+    BEGIN
+        INSERT INTO Employees (Employee_Id, First_Name, Surname,
+        Date_of_Birth, Position, Salary)
+        VALUES (@Employee_Id, @First_Name, @Surname,
+        @Date_of_Birth, @Position, @Salary)
+
+        PRINT 'New employee has been added.'
+    END
+    ELSE
+    BEGIN
+        PRINT 'Employee with the specified ID already exists.'
+    END
+END
+GO
+```
+3. The following procedure, upon the user providing a movie title, displays the number of days the movie was screened in the cinema via a message. In the case of a movie that was not screened or does not have specified start or end dates for screening, the user receives a message: "The number of days cannot be provided for the given movie title".
+```sql
+CREATE PROCEDURE P_Movie_Screening_Duration
+    @Movie_Title VARCHAR(50)
+AS
+BEGIN
+    DECLARE @Days_Count INT;
+    
+    SELECT @Days_Count = DATEDIFF(DAY, Screening_Start_Date, Screening_End_Date)
+    FROM Movies
+    WHERE Title = @Movie_Title;
+
+    IF @Days_Count IS NOT NULL
+    BEGIN
+        PRINT 'The movie "' + @Movie_Title + '" was screened for ' + CAST(@Days_Count AS VARCHAR(10)) + ' days.';
+    END
+    ELSE
+    BEGIN
+        PRINT 'The number of days cannot be provided for the given movie title.';
+    END
+END
+GO
+```
+## Functions:
+1. The following function displays the first names, last names, positions, and salaries of employees who earn above the value provided by the user.
+```sql
+CREATE FUNCTION F_Employees_Salaries (@MinAmount MONEY) RETURNS TABLE AS
+RETURN (
+    SELECT First_Name
+        , Surname
+        , Position
+        , Salary
+    FROM Employees
+    WHERE Salary > @MinAmount
+)
+GO
+```
+2. The following function will display the number of tickets sold for a specific type of room provided by the user.
+```sql
+CREATE FUNCTION F_Number_of_Sold_Tickets (
+    @Room_Type VARCHAR(50)
+)
+RETURNS @Result TABLE (
+    [Room_Type] VARCHAR(50),
+    [Number_of_Sold_Tickets] INT
+)
+AS
+BEGIN
+    INSERT INTO @Result
+    SELECT R.Room_Type,
+           COUNT(*)
+    FROM Rooms AS R
+    JOIN Tickets_Rooms AS TR ON (R.Room_Id = TR.Room_Id)
+    WHERE Room_Type = @Room_Type
+    GROUP BY R.Room_Type
+RETURN
+END
+GO
+```
+3. This function returns a table with movie titles and their premiere dates for the director whose last name is provided by the user.
+```sql
+CREATE FUNCTION F_Movies_and_Premiere_Dates (@Director_Surname VARCHAR(50)) 
+RETURNS TABLE 
+AS 
+RETURN (
+    SELECT M.Title
+         , M.Release_Date
+         , D.Surname
+    FROM Movies AS M
+    JOIN Directors_Movies AS DM ON (DM.Movie_Id = M.Movie_Id)
+    JOIN Directors AS D ON (D.Director_Id = DM.Director_Id)
+    WHERE D.Surname = @Director_Surname
+)
+GO
+```
